@@ -19,6 +19,7 @@ A step-by-step guide to set up Ansible with a master node and worker nodes using
 
 ## Prerequisites
 
+
 - 1 Master Node (Control Node) — Linux (Ubuntu/CentOS/RHEL)
 - 1 or more Worker Nodes (Managed Nodes) — Linux
 - Root or sudo access on all nodes
@@ -362,3 +363,188 @@ worker2  : ok=4  changed=2  unreachable=0  failed=0
 | `--check` | Dry-run (no changes made) |
 | `--limit worker1` | Run on a specific host only |
 | `--tags install` | Run only tasks with a specific tag |
+
+---
+
+## Real-Life Ansible Shell Commands (Ad-Hoc)
+
+Ad-hoc commands let you run one-off tasks on remote hosts without writing a playbook.  
+**Syntax:** `ansible <host-pattern> -i <inventory> -m <module> -a "<args>"`
+
+---
+
+### 🔍 System Information
+
+```bash
+# Check uptime on all workers
+ansible workers -i /etc/ansible/hosts -m command -a "uptime"
+
+# Get OS details
+ansible workers -i /etc/ansible/hosts -m command -a "cat /etc/os-release"
+
+# Check free disk space
+ansible workers -i /etc/ansible/hosts -m command -a "df -h"
+
+# Check memory usage
+ansible workers -i /etc/ansible/hosts -m command -a "free -m"
+
+# List all running processes
+ansible workers -i /etc/ansible/hosts -m command -a "ps aux"
+
+# Check hostname of each worker
+ansible workers -i /etc/ansible/hosts -m command -a "hostname"
+
+# Gather full system facts (CPU, memory, IPs, OS, etc.)
+ansible workers -i /etc/ansible/hosts -m setup
+
+# Filter facts — only get IP addresses
+ansible workers -i /etc/ansible/hosts -m setup -a "filter=ansible_default_ipv4"
+```
+
+---
+
+### 📦 Package Management
+
+```bash
+# Install a package (apt — Ubuntu/Debian)
+ansible workers -i /etc/ansible/hosts -m apt -a "name=curl state=present" --become
+
+# Install a package (yum — CentOS/RHEL)
+ansible workers -i /etc/ansible/hosts -m yum -a "name=curl state=present" --become
+
+# Remove a package
+ansible workers -i /etc/ansible/hosts -m apt -a "name=curl state=absent" --become
+
+# Update all packages (Ubuntu/Debian)
+ansible workers -i /etc/ansible/hosts -m apt -a "upgrade=dist update_cache=yes" --become
+
+# Check if a package is installed
+ansible workers -i /etc/ansible/hosts -m command -a "dpkg -l | grep nginx"
+```
+
+---
+
+### 🔧 Service Management
+
+```bash
+# Start a service
+ansible workers -i /etc/ansible/hosts -m service -a "name=nginx state=started" --become
+
+# Stop a service
+ansible workers -i /etc/ansible/hosts -m service -a "name=nginx state=stopped" --become
+
+# Restart a service
+ansible workers -i /etc/ansible/hosts -m service -a "name=nginx state=restarted" --become
+
+# Enable a service to start on boot
+ansible workers -i /etc/ansible/hosts -m service -a "name=nginx enabled=yes" --become
+
+# Check service status
+ansible workers -i /etc/ansible/hosts -m command -a "systemctl status nginx" --become
+```
+
+---
+
+### 📁 File & Directory Operations
+
+```bash
+# Create a directory on all workers
+ansible workers -i /etc/ansible/hosts -m file -a "path=/opt/myapp state=directory mode=0755" --become
+
+# Create an empty file
+ansible workers -i /etc/ansible/hosts -m file -a "path=/tmp/test.txt state=touch"
+
+# Delete a file
+ansible workers -i /etc/ansible/hosts -m file -a "path=/tmp/test.txt state=absent"
+
+# Copy a local file to all workers
+ansible workers -i /etc/ansible/hosts -m copy -a "src=/home/devops/app.conf dest=/etc/app.conf mode=0644" --become
+
+# Fetch a file FROM workers to master
+ansible workers -i /etc/ansible/hosts -m fetch -a "src=/var/log/nginx/error.log dest=/tmp/logs/ flat=no"
+
+# Write content directly into a file on workers
+ansible workers -i /etc/ansible/hosts -m copy -a "content='Hello from Ansible' dest=/tmp/hello.txt"
+```
+
+---
+
+### 👤 User Management
+
+```bash
+# Create a new user
+ansible workers -i /etc/ansible/hosts -m user -a "name=john state=present shell=/bin/bash" --become
+
+# Delete a user
+ansible workers -i /etc/ansible/hosts -m user -a "name=john state=absent remove=yes" --become
+
+# Add a user to a group
+ansible workers -i /etc/ansible/hosts -m user -a "name=john groups=sudo append=yes" --become
+
+# Check existing users
+ansible workers -i /etc/ansible/hosts -m command -a "cat /etc/passwd"
+```
+
+---
+
+### 🔒 Security & Firewall
+
+```bash
+# Open port 80 with UFW (Ubuntu)
+ansible workers -i /etc/ansible/hosts -m ufw -a "rule=allow port=80 proto=tcp" --become
+
+# Check UFW status
+ansible workers -i /etc/ansible/hosts -m command -a "ufw status" --become
+
+# Set file permissions
+ansible workers -i /etc/ansible/hosts -m file -a "path=/etc/app.conf mode=0600 owner=root group=root" --become
+
+# Check open ports
+ansible workers -i /etc/ansible/hosts -m command -a "ss -tlnp" --become
+```
+
+---
+
+### 🐚 Shell Commands (for pipelines, redirects, env vars)
+
+> Use `-m shell` when your command includes pipes `|`, redirects `>`, or environment variables `$`.
+
+```bash
+# Run a shell command with a pipe
+ansible workers -i /etc/ansible/hosts -m shell -a "ps aux | grep nginx"
+
+# Check disk usage of a specific directory
+ansible workers -i /etc/ansible/hosts -m shell -a "du -sh /var/log/*"
+
+# Tail the last 20 lines of a log file
+ansible workers -i /etc/ansible/hosts -m shell -a "tail -n 20 /var/log/syslog" --become
+
+# Run a script stored on the master node
+ansible workers -i /etc/ansible/hosts -m script -a "/home/devops/scripts/setup.sh" --become
+
+# Export an env variable and run a command
+ansible workers -i /etc/ansible/hosts -m shell -a "export APP_ENV=production && echo \$APP_ENV"
+
+# Reboot all worker nodes
+ansible workers -i /etc/ansible/hosts -m reboot --become
+
+# Check which user Ansible is connecting as
+ansible workers -i /etc/ansible/hosts -m command -a "whoami"
+```
+
+---
+
+### 📊 Quick Ad-Hoc Reference
+
+| Task | Command |
+|------|---------|
+| Ping all hosts | `ansible all -i hosts -m ping` |
+| Run uptime | `ansible all -i hosts -m command -a "uptime"` |
+| Install nginx | `ansible workers -i hosts -m apt -a "name=nginx state=present" --become` |
+| Restart nginx | `ansible workers -i hosts -m service -a "name=nginx state=restarted" --become` |
+| Copy a file | `ansible workers -i hosts -m copy -a "src=app.conf dest=/etc/app.conf" --become` |
+| Create a user | `ansible workers -i hosts -m user -a "name=john state=present" --become` |
+| Get system facts | `ansible workers -i hosts -m setup` |
+| Reboot nodes | `ansible workers -i hosts -m reboot --become` |
+| Run shell script | `ansible workers -i hosts -m script -a "/path/to/script.sh" --become` |
+| Check disk space | `ansible workers -i hosts -m command -a "df -h"` |
