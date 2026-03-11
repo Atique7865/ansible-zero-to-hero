@@ -268,3 +268,97 @@ ssh-copy-id devops@<worker-IP>
 ---
 
 > **Security Note:** Never share or expose `id_rsa` (private key). Only the public key (`id_rsa.pub`) is copied to worker nodes.
+
+---
+
+## Step 8: Create a Playbook to Install and Configure Nginx
+
+Create a file named `install_nginx.yml` on the **Master Node**:
+
+```bash
+nano install_nginx.yml
+```
+
+Add the following content:
+
+```yaml
+---
+- name: Install and configure Nginx
+  hosts: workers
+  become: yes
+
+  tasks:
+    - name: Update apt cache (Ubuntu/Debian)
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Nginx
+      package:
+        name: nginx
+        state: present
+
+    - name: Start and enable Nginx service
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Ensure Nginx is running
+      uri:
+        url: http://localhost
+        status_code: 200
+      register: result
+      ignore_errors: yes
+```
+
+---
+
+## Step 9: Run the Nginx Playbook
+
+```bash
+# Dry-run first (no changes made — recommended before first run)
+ansible-playbook -i /etc/ansible/hosts install_nginx.yml --check
+
+# Run the playbook
+ansible-playbook -i /etc/ansible/hosts install_nginx.yml
+
+# Run with verbose output to see task details
+ansible-playbook -i /etc/ansible/hosts install_nginx.yml -v
+```
+
+**Expected output:**
+
+```
+PLAY [Install and configure Nginx] *********************************************
+
+TASK [Update apt cache] ********************************************************
+ok: [worker1]
+ok: [worker2]
+
+TASK [Install Nginx] ***********************************************************
+changed: [worker1]
+changed: [worker2]
+
+TASK [Start and enable Nginx service] ******************************************
+changed: [worker1]
+changed: [worker2]
+
+TASK [Ensure Nginx is running] *************************************************
+ok: [worker1]
+ok: [worker2]
+
+PLAY RECAP *********************************************************************
+worker1  : ok=4  changed=2  unreachable=0  failed=0
+worker2  : ok=4  changed=2  unreachable=0  failed=0
+```
+
+### Useful Playbook Flags
+
+| Flag | Purpose |
+|------|---------|
+| `-i` | Specify inventory file |
+| `-v / -vv` | Verbose / extra verbose output |
+| `--check` | Dry-run (no changes made) |
+| `--limit worker1` | Run on a specific host only |
+| `--tags install` | Run only tasks with a specific tag |
