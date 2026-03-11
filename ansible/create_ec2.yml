@@ -1,0 +1,35 @@
+---
+- name: Create EC2 t2.micro Instance
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars/ec2_vars.yml
+
+  tasks:
+    - name: Launch EC2 instance
+      amazon.aws.ec2_instance:
+        name: "{{ instance_name }}"
+        region: "{{ aws_region }}"
+        instance_type: "{{ instance_type }}"
+        image_id: "{{ ami_id }}"
+        key_name: "{{ key_name }}"
+        security_group: "{{ security_group }}"
+        count: "{{ instance_count }}"
+        state: present
+        wait: true
+        tags:
+          Name: "{{ instance_name }}"
+          Environment: dev
+      register: ec2_result
+
+    - name: Display instance info
+      debug:
+        msg:
+          - "Instance ID   : {{ item.instance_id }}"
+          - "Public IP     : {{ item.public_ip_address | default('N/A') }}"
+          - "Private IP    : {{ item.private_ip_address }}"
+          - "Instance Type : {{ item.instance_type }}"
+          - "State         : {{ item.state.name }}"
+      loop: "{{ ec2_result.instances }}"

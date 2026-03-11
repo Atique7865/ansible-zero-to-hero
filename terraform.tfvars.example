@@ -1,0 +1,19 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+aws_region    = "us-east-1"
+instance_name = "my-ec2-instance"
+instance_type = "t3.micro"
+ami_id        = "ami-0c02fb55956c7d316" # Amazon Linux 2023 (us-east-1)
+
+vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
+
+key_name         = "my-key-pair"
+root_volume_size = 20
+
+allowed_ssh_cidr = ["YOUR_IP/32"] # Replace with your IP for security
+
+tags = {
+  Environment = "dev"
+  Project     = "my-project"
+}

@@ -1,0 +1,4 @@
+# Override defaults here if needed
+# nginx_web_root: /var/www/mysite
+# nginx_server_name: example.com
+# nginx_port: 80

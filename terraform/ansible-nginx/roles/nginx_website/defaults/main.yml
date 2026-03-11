@@ -1,0 +1,4 @@
+# Default variables (can be overridden in vars/main.yml or at runtime)
+nginx_web_root: /var/www/html
+nginx_server_name: "_"
+nginx_port: 80
