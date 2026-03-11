@@ -548,3 +548,241 @@ ansible workers -i /etc/ansible/hosts -m command -a "whoami"
 | Reboot nodes | `ansible workers -i hosts -m reboot --become` |
 | Run shell script | `ansible workers -i hosts -m script -a "/path/to/script.sh" --become` |
 | Check disk space | `ansible workers -i hosts -m command -a "df -h"` |
+
+---
+
+## Real-Life Ansible Playbook Examples — `vars` & `when` Conditions
+
+---
+
+### 🖥️ Example 1: Install a Web Server Based on OS Family
+
+Uses `vars` to define the package name and `when` to branch by OS.
+
+```yaml
+---
+- name: Install Web Server (OS-aware)
+  hosts: workers
+  become: yes
+  vars:
+    web_server_debian: nginx
+    web_server_redhat: httpd
+
+  tasks:
+    - name: Install Nginx on Debian/Ubuntu
+      apt:
+        name: "{{ web_server_debian }}"
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Apache (httpd) on CentOS/RHEL
+      yum:
+        name: "{{ web_server_redhat }}"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Start Nginx on Debian/Ubuntu
+      service:
+        name: "{{ web_server_debian }}"
+        state: started
+        enabled: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Start Apache on CentOS/RHEL
+      service:
+        name: "{{ web_server_redhat }}"
+        state: started
+        enabled: yes
+      when: ansible_os_family == "RedHat"
+```
+
+---
+
+### 👤 Example 2: Create a Deploy User Only in Production
+
+Uses `vars` to define environment and `when` to conditionally create the user.
+
+```yaml
+---
+- name: Setup Deploy User
+  hosts: workers
+  become: yes
+  vars:
+    environment: production
+    deploy_user: deployer
+    deploy_home: /home/deployer
+
+  tasks:
+    - name: Create deploy user (production only)
+      user:
+        name: "{{ deploy_user }}"
+        home: "{{ deploy_home }}"
+        shell: /bin/bash
+        state: present
+      when: environment == "production"
+
+    - name: Add deploy user to sudo group (production only)
+      user:
+        name: "{{ deploy_user }}"
+        groups: sudo
+        append: yes
+      when: environment == "production"
+
+    - name: Skip deploy setup — not production
+      debug:
+        msg: "Skipping deploy user setup in {{ environment }} environment"
+      when: environment != "production"
+```
+
+---
+
+### 💾 Example 3: Alert and Extend Disk Space if Usage is High
+
+Uses `register` to capture disk usage, then `when` to act only if a threshold is exceeded.
+
+```yaml
+---
+- name: Monitor and Alert Disk Usage
+  hosts: workers
+  become: yes
+  vars:
+    disk_threshold: 80
+    alert_email: ops-team@company.com
+
+  tasks:
+    - name: Get disk usage percentage on /
+      shell: df / | awk 'NR==2 {print $5}' | tr -d '%'
+      register: disk_usage
+      changed_when: false
+
+    - name: Print current disk usage
+      debug:
+        msg: "Current disk usage on {{ inventory_hostname }}: {{ disk_usage.stdout }}%"
+
+    - name: Warn if disk usage is above threshold
+      debug:
+        msg: "⚠️  WARNING: Disk usage {{ disk_usage.stdout }}% exceeds {{ disk_threshold }}% on {{ inventory_hostname }}!"
+      when: disk_usage.stdout | int > disk_threshold
+
+    - name: Clean apt cache if disk is above threshold (Debian)
+      apt:
+        autoclean: yes
+        autoremove: yes
+      when:
+        - disk_usage.stdout | int > disk_threshold
+        - ansible_os_family == "Debian"
+```
+
+---
+
+### 🔒 Example 4: Open Firewall Ports Based on App Role
+
+Uses `vars` to define port list and `when` to apply rules only for specific server roles.
+
+```yaml
+---
+- name: Configure Firewall by Server Role
+  hosts: workers
+  become: yes
+  vars:
+    server_role: webserver        # Options: webserver, dbserver, cacheserver
+    web_ports: [80, 443]
+    db_port: 5432
+    cache_port: 6379
+
+  tasks:
+    - name: Open HTTP/HTTPS ports (web servers only)
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: "{{ web_ports }}"
+      when: server_role == "webserver"
+
+    - name: Open PostgreSQL port (DB servers only)
+      ufw:
+        rule: allow
+        port: "{{ db_port }}"
+        proto: tcp
+      when: server_role == "dbserver"
+
+    - name: Open Redis port (cache servers only)
+      ufw:
+        rule: allow
+        port: "{{ cache_port }}"
+        proto: tcp
+      when: server_role == "cacheserver"
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+```
+
+---
+
+### 🚀 Example 5: Deploy App and Run DB Migration Only on First Deploy
+
+Uses `vars` + `stat` module + `when` to detect first-time deploys.
+
+```yaml
+---
+- name: Deploy Application
+  hosts: workers
+  become: yes
+  vars:
+    app_dir: /opt/myapp
+    app_repo: https://github.com/myorg/myapp.git
+    app_version: v2.1.0
+    run_migrations: true
+
+  tasks:
+    - name: Check if app directory already exists
+      stat:
+        path: "{{ app_dir }}"
+      register: app_dir_stat
+
+    - name: Clone app repo (first deploy only)
+      git:
+        repo: "{{ app_repo }}"
+        dest: "{{ app_dir }}"
+        version: "{{ app_version }}"
+      when: not app_dir_stat.stat.exists
+
+    - name: Pull latest code (subsequent deploys)
+      git:
+        repo: "{{ app_repo }}"
+        dest: "{{ app_dir }}"
+        version: "{{ app_version }}"
+        update: yes
+      when: app_dir_stat.stat.exists
+
+    - name: Run database migrations (only if enabled)
+      command: python manage.py migrate
+      args:
+        chdir: "{{ app_dir }}"
+      when:
+        - run_migrations | bool
+        - not app_dir_stat.stat.exists   # Only on first deploy
+
+    - name: Restart application service
+      service:
+        name: myapp
+        state: restarted
+```
+
+---
+
+### 📋 Vars & Conditions Quick Reference
+
+| Feature | Syntax | Use Case |
+|---------|--------|----------|
+| Define variable | `vars: myvar: value` | Reusable config values |
+| Use variable | `"{{ myvar }}"` | Reference a var in a task |
+| OS condition | `when: ansible_os_family == "Debian"` | Branch by OS type |
+| Variable condition | `when: environment == "production"` | Branch by custom var |
+| Register output | `register: result` | Capture task output |
+| Condition on output | `when: result.stdout \| int > 80` | Act based on task output |
+| Boolean check | `when: run_migrations \| bool` | Check boolean vars |
+| Multiple conditions | `when:` + list of conditions | All must be true (AND logic) |
+| Negation | `when: not app_exists` | Invert a condition |
